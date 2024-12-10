@@ -2,6 +2,7 @@
 
 export(RollCAViaR)
 import(progress)
+importFrom(Rsolnp,solnp)
 importFrom(xts,xts)
 importFrom(zoo,na.locf)
 useDynLib(caviar)

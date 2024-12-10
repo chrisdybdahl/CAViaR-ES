@@ -1,6 +1,6 @@
 test_that("forecast_u_CAViaR runs without errors and returns expected structure", {
   # Generate sample data
-  set.seed(12)
+  set.seed(123)
   #dates <- seq.Date(from = as.Date("2023-01-01"), by = "day", length.out = 1000)
   #df <- data.frame(Date = dates, Return = rnorm(1000))
   df <- read.csv("C:/Users/chris/RStudioProjects/caviar/data/clean_returns.csv", row.names = 1)
@@ -11,17 +11,18 @@ test_that("forecast_u_CAViaR runs without errors and returns expected structure"
 
   # Parameters
   c <- 0.05
-  n <- 100
-  m <- 500
+  n <- 989
+  m <- 250
   r <- 10
-  control <- list(trace = 1, factr = 1e-8)
-  var_model <- "SAV"
+  verbose <- 3
+  control <- list(trace = 1, factr = 1e-7)
+  var_model <- "AS"
   es_model <- "MULT"
 
   # Call the function
   result <- RollCAViaR(asset_df, c = c, n = n, m = m, r = r,
                        var_model = var_model, es_model = es_model,
-                       control = control)
+                       verbose = verbose, control = control)
 
   print(result)
 

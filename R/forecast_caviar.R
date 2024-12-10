@@ -6,14 +6,14 @@
 #' @import progress
 #' @importFrom xts xts
 #' @importFrom zoo na.locf
-#' @importFrom solnp solnp
+#' @importFrom Rsolnp solnp
 RollCAViaR <- function(
     data,
     c,
     n,
     m,
     r = 10,
-    var_model = "ADAPTIVE",
+    var_model ="ADAPTIVE",
     es_model = "MULT",
     loss = "AL",
     lb = -1,
@@ -22,9 +22,6 @@ RollCAViaR <- function(
     verbose = 0,
     ...
 ) {
-
-
-
   # Initialize variables for es_model
   if (es_model == "MULT") {
     es_func <- mult_ES_C
@@ -34,8 +31,8 @@ RollCAViaR <- function(
   } else if (es_model == "AR") {
     es_func <- ar_ES_C
     n_gammas <- 3
-    upper_gamma <- ub
-    lower_gamma <- 0
+    upper_gamma <- c(ub, ub, ub)
+    lower_gamma <- c(0, 0, 0)
   } else {
     stop("Invalid ES model")
   }
@@ -117,7 +114,6 @@ RollCAViaR <- function(
     window_end <- m + i - 1
     window <- df[window_start:window_end]
 
-    # Reparametrize for every r period
     if (i %% r == 0 || i == 1) {
       optim_function <- objective_handler(window, c, var_func, es_func, n_betas, loss_func)
 
@@ -127,38 +123,107 @@ RollCAViaR <- function(
       best_grid_index <- which.min(grid_losses)
       initial_params <- grid[best_grid_index, ]
 
-      # Optimize using optim with initial parameters from grid
-      result <- tryCatch({
-        solnp(
-          par = initial_params,
-          fn = optim_function,
-          method = "L-BFGS-B",
-          lower = lower,
-          upper = upper,
-          ...
-        )
-      }, error = function(e) {
-        message("Optimization failed: ", e$message)
-        NULL
-      }, warning = function(w) {
-        message("Optimization warning: ", w$message)
-        NULL
-      })
+      print(length(initial_params))
 
-      # Update parameters
-      if (!is.null(result$par)) {
-        last_params <- result$par
+      # Initialize status variable
+      status <- list(
+        success = FALSE,
+        method = NULL,
+        params = NULL,
+        message = NULL,
+        convergence_code = NULL,
+        objective_value = NULL
+      )
 
-        if (result$convergence != 0) {
-          warning("Optimization did not converrge iteration ", i, ", convergence code: ", result$convergence, ", message: ", result$message)
+      # optim
+      if (!status$success) {
+        result <- tryCatch({
+          optim(
+            par = initial_params,
+            fn = optim_function,
+            method = "L-BFGS-B",
+            lower = lower,
+            upper = upper,
+            ...
+          )
+        }, error = function(e) {
+          status$message <- paste("Optimization with optim failed:", e$message)
+          NULL
+        }, warning = function(w) {
+          status$message <- paste("Optimization with optim warning:", w$message)
+          NULL
+        })
+
+        if (!is.null(result) && !is.null(result$par)) {
+          status$success <- (result$convergence == 0)
+          status$convergence_code <- result$convergence
+          if (status$success) {
+            status$method <- "optim"
+            status$objective_value <- result$value
+            status$params <- result$par
+            last_params <- result$par
+          } else {
+            status$message <- paste("Optimization with optim did not converge. Convergence code:",
+                                    status$convergence_code, ", message:", result$message)
+            warning("Iteration ", i, ": ", status$message)
+          }
+        } else {
+          warning("Iteration ", i, ": ", status$message)
         }
-      } else {
-        warning("Optimization failed at iteration ", i, ", skipping param optimization")
-        if(any(is.na(last_params))) {
+      }
+
+      # solnp
+      if (!status$success) {
+        if (verbose > 1) message("Trying optimization with solnp as fallback at iteration ", i)
+        result <- tryCatch({
+          Rsolnp::solnp(
+            pars = initial_params,
+            fun = optim_function,
+            LB = lower,
+            UB = upper,
+            ...
+          )
+        }, error = function(e) {
+          status$message <- paste("Optimization with solnp failed:", e$message)
+          NULL
+        })
+
+        if (!is.null(result) && !is.null(result$pars)) {
+          status$success <- (result$convergence == 0)
+          status$convergence_code <- result$convergence
+          if (status$success) {
+            status$method <- "solnp"
+            status$objective_value <- "Not available"
+            status$params <- result$pars
+            last_params <- result$pars
+          } else {
+            status$message <- paste("Optimization with solnp did not converge. Convergence code:",
+                                    status$convergence_code, ", function evaluations:", result$nfuneval)
+            warning("Iteration ", i, ": ", status$message)
+          }
+        } else {
+          warning("Iteration ", i, ": ", status$message)
+        }
+      }
+
+      if (!status$success) {
+        status$message <- paste(status$message, "All optimizers failed.")
+        warning("Iteration ", i, ": ", status$message)
+        if (any(is.na(last_params))) {
           var[i] <- NA
           es[i] <- NA
           next
         }
+      }
+
+      if (verbose > 2) {
+        # Log detailed status for diagnostics
+        message("Iteration ", i, ": Optimization status - ",
+                if (status$success) "Success" else "Failure",
+                ". Method: ", status$method,
+                ". Convergence Code: ", status$convergence_code,
+                ". Objective Value: ", status$objective_value,
+                ". Message: ", status$message)
       }
     }
 
@@ -211,13 +276,14 @@ objective_handler <- function(y, c, func_Q, func_ES, n_betas, loss_function) {
     ES <- func_ES(y = y, Q = Q, gammas = gammas)
 
     # Calculate the loss vector
-    ES[ES >= 0] <- -1e-10
+    mask <- ES >= 0
+    ES[mask] <- -1e-10
     loss_vector <- loss_function(y, Q, ES, c)
 
-    out_of_bounds_val <- 5 * max(loss_vector)
+    out_of_bounds_val <- 10 * max(loss_vector)
 
-    # # Handle NA or infinite values to prevent errors in optimization
-    loss_vector[is.na(loss_vector) | is.infinite(loss_vector)] <- out_of_bounds_val
+    # Handle NA or infinite values to prevent errors in optimization
+    loss_vector[is.na(loss_vector) | is.infinite(loss_vector) | mask] <- out_of_bounds_val
     loss_vector[Q >= 0] <- out_of_bounds_val
 
     return(mean(loss_vector))
