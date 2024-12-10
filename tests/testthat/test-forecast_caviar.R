@@ -4,7 +4,7 @@ test_that("forecast_u_CAViaR runs without errors and returns expected structure"
   #dates <- seq.Date(from = as.Date("2023-01-01"), by = "day", length.out = 1000)
   #asset_df <- data.frame(Date = dates, Return = rnorm(1000))
   df <- read.csv("C:/Users/chris/RStudioProjects/caviar/data/clean_returns.csv", row.names = 1)
-  asset_df <- df["DEBMc1"]
+  asset_df <- df["DEPYc1"]
   asset_df$Date <- as.Date(rownames(asset_df))
   colnames(asset_df) <- c("Return", "Date")
   rownames(asset_df) <- NULL
@@ -14,19 +14,21 @@ test_that("forecast_u_CAViaR runs without errors and returns expected structure"
   options(warn = 1)
 
   # Parameters
-  c <- 0.025
-  n <- 10
+  c <- 0.05
+  n <- 989
   m <- 250
   r <- 10
   verbose <- 3
-  control <- list(trace = 0, factr = 1e-7)
-  var_model <- "ADAPTIVE"
-  es_model <- "AR"
+  control.optim <- list(factr = 1e-7)
+  control.solnp <- list(tol = 1e-7, trace = 0)
+  var_model <- "AS"
+  es_model <- "MULT"
 
   # Call the function
   result <- RollCAViaR(asset_df, c = c, n = n, m = m, r = r,
                        var_model = var_model, es_model = es_model,
-                       verbose = verbose, control = control)
+                       verbose = verbose, control.optim = control.optim,
+                       control.solnp = control.solnp)
 
   print(result)
 

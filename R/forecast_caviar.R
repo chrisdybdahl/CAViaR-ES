@@ -212,13 +212,18 @@ RollCAViaR <- function(
       }
 
       if (!status$success) {
-        status$message <- paste(status$message, "All optimizers failed.")
-        warning("Iteration ", i, ": ", status$message)
-        if (any(is.na(last_params))) {
+        if (any(is.na(last_params)) && !any(is.na(status$params))) {
+          handling <- "No valid parameters from previous optimization runs, using best parameters from current."
+          last_params <- status$params
+        } else {
+          handling <- "No valid parameters from previous or current optimization runs, skipping calculation."
           var[i] <- NA
           es[i] <- NA
           next
         }
+
+        status$message <- paste("All optimizers failed:", handling, "Message from last optimizer:", status$message)
+        warning("Iteration ", i, ": ", status$message)
       }
 
       if (verbose > 2) {
