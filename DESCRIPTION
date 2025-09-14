@@ -4,8 +4,8 @@ Title: Rolling window forecast of VaR and ES using CAViaR
 Version: 0.1.0
 Author: Christopher Laloi Dybdahl
 Maintainer: Christopher Laloi Dybdahl <chrisdybdahly@gmail.com>
-Description: More about what it does (maybe more than one line)
-    Use four spaces when indenting paragraphs within the Description.
+Description: Conditional Autoregressive Value at
+Risk (Engle and Manganelli, 2004) and Expected Shortfall (Taylor, 2019)
 License: MIT license
 Encoding: UTF-8
 LazyData: true
