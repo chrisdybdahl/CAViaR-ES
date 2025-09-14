@@ -4,8 +4,8 @@ Title: Rolling window forecast of VaR and ES using CAViaR
 Version: 0.1.0
 Author: Christopher Laloi Dybdahl
 Maintainer: Christopher Laloi Dybdahl <chrisdybdahly@gmail.com>
-Description: Conditional Autoregressive Value at
-Risk (Engle and Manganelli, 2004) and Expected Shortfall (Taylor, 2019)
+Description: Package for Conditional Autoregressive Value at
+Risk (Engle and Manganelli, 2004) and Expected Shortfall (Taylor, 2019) with rolling window and recalibration frequency. Sample data is EEX German power futures returns.
 License: MIT license
 Encoding: UTF-8
 LazyData: true
